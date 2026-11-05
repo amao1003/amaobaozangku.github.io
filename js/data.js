@@ -1,5 +1,5 @@
 /* ============================================================
- * 由 editor.html 导出 · 2026/11/5 15:49:13
+ * 由 editor.html 导出 · 2026/11/5 16:19:22
  * 全站内容数据。字段说明见项目 README.md，或看原版 data.js 顶部注释。
  * 覆盖本文件后刷新 index.html 即生效。
  * ============================================================ */
@@ -7,7 +7,7 @@
 window.SITE = {
   "meta": {
     "title": "阿猫宝藏库",
-    "heading": "",
+    "heading": "阿猫宝藏库",
     "subtitle": "",
     "description": "",
     "ribbon": {
@@ -35,73 +35,7 @@ window.SITE = {
     {
       "title": "01　影视／动漫／直播／纪录片",
       "note": "示例栏目，替换成你自己的内容",
-      "children": [
-        {
-          "title": "01.综合影视",
-          "note": "提供在线观看，部分站点同时提供下载",
-          "items": [
-            {
-              "title": "🥇示例·公共视频平台",
-              "url": "https://www.bilibili.com/",
-              "icon": "web",
-              "note": "这里写站点补充说明，鼠标移到 ⓘ 上可以看到",
-              "date": "2026-11-03"
-            }
-          ]
-        },
-        {
-          "title": "02.影视下载",
-          "items": [
-            {
-              "title": "🥇示例·开源媒体库",
-              "url": "https://archive.org/",
-              "icon": "web",
-              "note": "公共领域影像资料"
-            },
-            {
-              "title": "🥈示例·字幕资源",
-              "url": "https://www.opensubtitles.org/zh",
-              "icon": "doc"
-            },
-            {
-              "type": "popup",
-              "title": "📃点我查看使用方法",
-              "icon": "doc",
-              "html": "<p>原站的「解析接口」就是这种点击弹窗条目。</p><p>你可以在 <code>data.js</code> 里直接写 HTML，例如链接列表、步骤说明。</p>"
-            }
-          ]
-        },
-        {
-          "title": "03.在线动漫",
-          "items": [
-            {
-              "title": "🥇示例·动漫资讯",
-              "url": "https://bangumi.tv/",
-              "icon": "web"
-            },
-            {
-              "title": "🥈示例·番组表",
-              "url": "https://bgmlist.com/",
-              "icon": "doc"
-            }
-          ]
-        },
-        {
-          "title": "04.电视直播",
-          "items": [
-            {
-              "title": "示例·央视网",
-              "url": "https://www.cctv.com/",
-              "icon": "youtube"
-            },
-            {
-              "title": "示例·央视频",
-              "url": "https://www.yangshipin.cn/",
-              "icon": "web"
-            }
-          ]
-        }
-      ]
+      "children": []
     },
     {
       "title": "02　电子书／漫画／音乐／听书",
