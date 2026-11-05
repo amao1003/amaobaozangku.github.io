@@ -145,6 +145,23 @@ html.no-fa .ic::before { content: "\25CF" !important; color: var(--icon-web) !im
 .topSerach .ic { width: auto; margin-left: 4px; }
 .topSerach:hover { border-color: var(--link-hover); }
 
+/* 顶部「搜索本站」按钮的放大镜：用内联 SVG 绘制，不依赖 Font Awesome CDN。
+   字体加载失败时（html.no-fa 会把图标降级成圆点），这里依旧是放大镜。 */
+html .topSerach .ic-search::before {
+  content: "" !important;
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236495ed' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='6.6'/%3E%3Cpath d='M15 15l5.5 5.5'/%3E%3C/svg%3E") no-repeat center / contain;
+  vertical-align: -2px;
+}
+/* html.no-fa 的降级规则特异性更高，这里单独压回去，避免圆点和放大镜叠在一起 */
+html.no-fa .topSerach .ic-search::before { content: "" !important; }
+html.dark-mode .topSerach .ic-search::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237fa9f5' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='6.6'/%3E%3Cpath d='M15 15l5.5 5.5'/%3E%3C/svg%3E");
+}
+.topSerach:hover .ic-search::before { filter: brightness(1.15); }
+
 /* ---------- 目录树（核心：与原站同构） ---------- */
 ul li ul { display: none; }
 ul li ul.open { display: block; }

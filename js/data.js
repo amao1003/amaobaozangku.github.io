@@ -17,7 +17,7 @@ window.SITE = {
     "topButtons": [
       {
         "text": "搜索本站",
-        "icon": "tree",
+        "icon": "search",
         "action": "search"
       },
       {

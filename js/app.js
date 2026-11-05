@@ -204,7 +204,9 @@
     (META.topButtons || []).forEach(function (btn) {
       var a = el('a', 'topSerach');
       a.appendChild(document.createTextNode(btn.text || '按钮'));
-      if (btn.icon) a.appendChild(icon(btn.icon));
+      // 「搜索本站」固定显示放大镜：即使编辑器导出的数据里 icon 写成别的，也不会变回旧图标
+      var iconName = btn.action === 'search' ? 'search' : btn.icon;
+      if (iconName) a.appendChild(icon(iconName));
       if (btn.action === 'search') {
         a.href = 'javascript:void(0)';
         a.setAttribute('target', '_self');

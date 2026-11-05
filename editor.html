@@ -437,7 +437,7 @@ function renderForm(){
     var r2=document.createElement('div');r2.className='row2';
     r2.appendChild(field('近 N 天标绿','recentDays',String(m.recentDays||10),'text',{skipBind:true,tip:'填数字，例如 10'}));
     r2.lastChild.querySelector('input').addEventListener('input',function(){state.meta.recentDays=Number(this.value)||10;saveDraft();});
-    r2.appendChild(field('顶部按钮（JSON 数组）','topButtons',JSON.stringify(m.topButtons||[]),'textarea',{jsonField:true,tip:'格式：[{"text":"搜索本站","icon":"tree","action":"search"}]'}));
+    r2.appendChild(field('顶部按钮（JSON 数组）','topButtons',JSON.stringify(m.topButtons||[]),'textarea',{jsonField:true,tip:'格式：[{"text":"搜索本站","icon":"search","action":"search"}]（搜索按钮固定显示放大镜）'}));
     host.appendChild(r2);
     var r3=document.createElement('div');r3.className='row2';
     r3.appendChild(field('显示右侧目录','showSidebar',String(m.showSidebar!==false),'select',{skipBind:true,options:[['true','显示'],['false','隐藏']]}));

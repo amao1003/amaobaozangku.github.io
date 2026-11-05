@@ -3,7 +3,7 @@
    --------------------------------------------------------------------------
    · 纯 Canvas 实现，不依赖任何库，不影响 js/app.js 的渲染与交互
    · 背景层：十几个不同颜色的空心小星星，各自随机节奏轻轻跃动/闪一下，
-     互不同步、此起彼伏；低透明度、无填充，风格克制
+     互不同步、此起彼伏；柔和低饱和、无填充，风格克制
    · 交互层：只在点击页面空白处时出现六臂雪花
    · 自动跟随浅色 / 深色模式；高分屏按 DPR 渲染；后台暂停绘制；
      尊重系统「减少动态效果」设置
@@ -20,9 +20,9 @@
   var DEFAULTS = {
     stars: true,        // 背景空心星星
     snow: true,         // 点击空白雪花绽放
-    starCount: 14,      // 星星数量（建议 8~24）
+    starCount: 18,      // 星星数量（建议 8~24）
     starSize: 1,        // 星星大小倍率
-    starAlpha: 1,       // 星星浓度倍率（0~1，0 等于关闭）
+    starAlpha: 1,       // 星星浓度倍率（0~2.5，1 为默认；1.5 更明显）
     snowSize: 1,        // 雪花大小倍率
     maxBursts: 6        // 同屏最多几朵雪花，防止连点卡顿
   };
@@ -33,7 +33,7 @@
   merge(UX);   // 用户在 index.html 里写的开关，优先级最高
   // 兼容上一版「线条」的旧键名（万一 index.html 没同步更新）
   if (UX.stars === undefined && UX.lines !== undefined) CFG.stars = UX.lines;
-  if (UX.starCount === undefined && UX.lineCount !== undefined) CFG.starCount = Math.max(4, Math.round(Number(UX.lineCount) * 3.5) || 14);
+  if (UX.starCount === undefined && UX.lineCount !== undefined) CFG.starCount = Math.max(4, Math.round(Number(UX.lineCount) * 3.5) || 18);
   if (UX.starAlpha === undefined && UX.lineAlpha !== undefined) CFG.starAlpha = UX.lineAlpha;
 
   var TAU = Math.PI * 2;
@@ -51,7 +51,7 @@
       [208, 168,  98],  // 金
       [204, 136, 156]   // 粉
     ],
-    starBase: 0.19,
+    starBase: 0.44,
     snow: [100, 149, 237], glow: [100, 149, 237]
   };
   var DARK = {
@@ -63,7 +63,7 @@
       [232, 192, 120],
       [228, 160, 180]
     ],
-    starBase: 0.24,
+    starBase: 0.42,
     snow: [162, 199, 255], glow: [127, 169, 245]
   };
   function pal() { return document.documentElement.classList.contains('dark-mode') ? DARK : LIGHT; }
@@ -99,7 +99,7 @@
   var stars = [];
 
   function buildStars() {
-    var n = Math.max(1, Math.min(40, Number(CFG.starCount) || 14));
+    var n = Math.max(1, Math.min(40, Number(CFG.starCount) || 18));
     if (coarse) n = Math.max(1, Math.ceil(n / 2));
     var size = Math.max(0.5, Math.min(2.5, Number(CFG.starSize) || 1));
     var colors = LIGHT.stars.length;
@@ -108,7 +108,7 @@
       stars.push({
         px: 0.04 + Math.random() * 0.92,      // 位置按视口比例存，resize 不会挤成一团
         py: 0.05 + Math.random() * 0.90,
-        r: (4.4 + Math.random() * 5.0) * size,
+        r: (5.0 + Math.random() * 5.6) * size,
         colorIdx: i % colors,                 // 轮流取色，保证「不同色彩」且分布均匀
         alpha: 0.72 + Math.random() * 0.5,
         phase: Math.random() * TAU,
@@ -143,7 +143,7 @@
   function drawStars(now) {
     var p = pal();
     var aScale = Number(CFG.starAlpha);
-    aScale = isNaN(aScale) ? 1 : Math.max(0, Math.min(1, aScale));
+    aScale = isNaN(aScale) ? 1 : Math.max(0, Math.min(2.5, aScale));
     bctx.clearRect(0, 0, W, H);
     if (!aScale) return;
 
@@ -173,11 +173,11 @@
             + Math.cos(t * s.sp2 + s.phase * 1.7) * s.amp * 0.8
             + Math.sin(t * s.sp1 * 0.6 + s.phase) * s.amp * 0.4
             + my - pulse * 5;
-      var r = s.r * (1 + pulse * 0.32);
-      var a = Math.min(0.42, p.starBase * s.alpha * (0.85 + pulse * 0.95) * aScale);
+      var r = s.r * (1 + pulse * 0.38);
+      var a = Math.min(0.74, p.starBase * s.alpha * (0.85 + pulse * 0.95) * aScale);
 
       bctx.strokeStyle = rgba(p.stars[s.colorIdx % p.stars.length], a);
-      bctx.lineWidth = 1;
+      bctx.lineWidth = 1.25;
       starPath(bctx, x, y, r, s.points, s.rot + (reduceMotion ? 0 : t * s.rotSp));
     }
   }
