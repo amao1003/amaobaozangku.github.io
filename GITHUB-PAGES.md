@@ -28,7 +28,9 @@
 | 凭据助手 | 已配置 `manager`（Git Credential Manager） | 第一次 push 会弹窗用浏览器登录 GitHub，不用手动折腾 token |
 | 直连 github.com | 不通 | 必须走代理 |
 | Windows 系统代理 | `127.0.0.1:7892`，实测访问 github.com / api.github.com 均返回 200 | 浏览器能开 GitHub 就是靠它 |
-| Git 是否自动读系统代理 | **不会** | 必须显式给 Git 配代理，否则 push 一定超时 |
+| 端口由谁提供 | `F:\hhycenter\hhycenterCore.exe` 监听 7892；Clash Verge 配置为 7897 但当前未接管 | 两个软件端口不同，以 Windows 显示为准 |
+| Git 是否自动读系统代理 | **不会** | 脚本已用 `reg query` 自动读取并显式配给 Git，否则 push 一定超时 |
+| 查看端口 | 双击 `检查网络.bat`（只看不改） | 显示端口、监听状态、GitHub 连通性 |
 
 > 一句话：**你卡住大概率不是命令敲错，而是 Git 没走代理 + 没登录。**
 
@@ -96,7 +98,7 @@
 
 - 自动定位本机便携版 Git 的绝对路径（系统 PATH 里没有 Git，脚本已写死实测路径）
 - 用 `用户名@users.noreply.github.com` 自动设置提交身份（GitHub 官方隐私邮箱，不用查注册邮箱）
-- 自动配置 `http.proxy` / `https.proxy` = `http://127.0.0.1:7892`，并清空会干扰的沙箱代理变量
+- 用 `reg query` 自动读取 Windows 系统代理端口（当前 7892；换软件或换端口会自动跟随），写入 `http.proxy` / `https.proxy`，并清空会干扰的沙箱代理变量
 - 自动 `remote add origin` → `git add -A` → `git commit` → `git push -u origin main`
 - push 失败时自动尝试 `git pull --allow-unrelated-histories --no-edit -X ours` 后重推（应对建仓库时勾了 README）
 - 成功后自动打开 Pages 设置页，并打印最终网址
@@ -105,8 +107,9 @@
 详细图解见 `小白上线指南.html`。
 
 以后改完内容，双击 **`一键更新.bat`** 即可（自动 add / commit / push），不用再填任何信息。
+想确认端口或网络是否正常，双击 **`检查网络.bat`**（只看不改，用中文显示端口、代理软件状态和 GitHub 连通性）。
 
-> 这两个 `.bat` 用 GBK 编码 + CRLF 换行（本机 cmd 代码页 936），含本机绝对路径，已加入 `.gitignore`，**不会上传到公开仓库**。
+> 这三个 `.bat` 用 GBK 编码 + CRLF 换行（本机 cmd 代码页 936），含本机绝对路径，已加入 `.gitignore`，**不会上传到公开仓库**。
 
 ### B0-备选：想自己敲命令（可选）
 
@@ -129,14 +132,30 @@ git config --global user.email "你注册GitHub的邮箱"
 想确认：`git config --global user.name`
 
 ### B2. 配置代理（本机关键一步）
-你的系统代理是 `127.0.0.1:7892`，Git 默认不读，必须显式告诉它：
+
+Git 不会自动读 Windows 的系统代理，必须显式告诉它。当前系统代理是 `127.0.0.1:7892`（实测 github.com / api.github.com 均返回 200）。
+
+**端口 7892 在哪看、在哪设：**
+
+| 想干什么 | 去哪里 |
+|---|---|
+| 只看一眼当前端口 | 双击 `检查网络.bat`（同时显示端口、监听状态、GitHub 连通性）；或 PowerShell 执行 `(Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings').ProxyServer` |
+| 在 Windows 里看 | 设置 → 网络和 Internet → 代理 → 手动设置代理 → **编辑** → 「端口」栏 |
+| 在软件里改端口 | 打开代理软件 → 设置 → 找「端口设置 / HTTP 混合端口 / Mixed Port / 本地监听端口」→ 改数字后重新打开「系统代理」开关 |
+| 查端口归哪个程序 | `Get-NetTCPConnection -LocalPort 7892 -State Listen` 拿 PID，再 `Get-Process -Id <PID>` |
+
+本机实测：7892 由 `F:\hhycenter\hhycenterCore.exe` 监听并写入系统代理；另装有 Clash Verge，其配置 `mixed-port: 7897` / `verge_mixed_port: 7897`（`%APPDATA%\io.github.clash-verge-rev.clash-verge-rev\config.yaml`），当前未接管系统代理。**两个软件端口不同，以 Windows 里显示的为准。**
+
+> 端口不需要手工维护：`一键上线.bat` / `一键更新.bat` 已改为用 `reg query` 读取 `ProxyServer` 并自动取冒号后的端口，读不到才回退 7892；模拟端口改成 7897 已实测能自动跟随。
+
+手动配置命令（把 `端口` 换成上面查到的数字）：
 
 ```bash
-git config --global http.proxy http://127.0.0.1:7892
-git config --global https.proxy http://127.0.0.1:7892
+git config --global http.proxy http://127.0.0.1:端口
+git config --global https.proxy http://127.0.0.1:端口
 ```
 
-- 如果你的代理软件端口不是 7892，改成它实际的端口（在代理软件设置里看「HTTP 混合端口 / 本地监听端口」）。
+- 端口变了不用改脚本，重新双击一次即可。
 - 以后换了网络、不需要代理了，用这两行取消：
   ```bash
   git config --global --unset http.proxy
@@ -214,7 +233,7 @@ git push
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
-| `Failed to connect to github.com port 443: Timed out` | Git 没走代理 | 执行 B2；WorkBuddy 终端还要先 `unset` 沙箱代理变量 |
+| `Failed to connect to github.com port 443: Timed out` | Git 没走代理，或代理软件没开 | 先双击 `检查网络.bat` 确认；执行 B2；WorkBuddy 终端还要先 `unset` 沙箱代理变量 |
 | `Authentication failed` / `Password authentication was removed` | 用了账号密码 | 用浏览器授权，或改用 PAT 当密码 |
 | `fatal: remote origin already exists` | 之前加过远程 | `git remote set-url origin https://github.com/用户名/仓库名.git` |
 | `error: failed to push some refs` / 提示先 pull | 建仓库时勾了 README / License，远端已有提交 | `git pull origin main --rebase` 后再 `git push`；或按提示操作 |

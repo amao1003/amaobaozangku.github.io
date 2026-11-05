@@ -231,7 +231,7 @@ window.SITE = {
 cd axutongxue-clone
 git config --global user.name "你的GitHub用户名"
 git config --global user.email "你的GitHub邮箱"
-git config --global http.proxy http://127.0.0.1:7892   # 国内环境必配，按实际端口改
+git config --global http.proxy http://127.0.0.1:端口   # 国内环境必配；端口取自「设置-网络-代理」，一键上线.bat 会自动读取
 git remote add origin https://github.com/你的用户名/仓库名.git
 git commit -m "init: 资源导航站"
 git push -u origin main
