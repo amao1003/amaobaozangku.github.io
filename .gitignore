@@ -1,0 +1,24 @@
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Local drafts, backups and temp files
+# NOTE: js/data.js is the real site content - never ignore it
+*.bak
+*_backup.*
+site-data.json
+_check_editor.js
+_dryrun.bat
+*.log
+
+# Local-only helper tools (contain this PC's absolute paths; keep them private)
+# 本地专用工具，不上传到公开仓库
+一键上线.bat
+一键更新.bat
+小白上线指南.html

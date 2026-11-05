@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=0.5, maximum-scale=2.0, user-scalable=yes">
+<base target="_blank">
+<meta name="description" content="个人互联网资源导航">
+<link rel="canonical" href="./">
+<link rel="stylesheet" href="css/style.css">
+<!-- 图标字体：联网时与原站一致；离线时 app.js 会自动启用字符兜底，不影响使用 -->
+<link rel="stylesheet" href="https://code.bdstatic.com/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+<title>我的资源导航</title>
+</head>
+<body>
+
+<!-- 左上角：浅色 / 深色模式切换 -->
+<button id="themeToggle" class="darkmode-toggle" title="切换深浅色（也可按 D 键）" aria-label="切换深浅色">
+  <span class="light"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='5' fill='%23f5a623'/%3E%3Cg stroke='%23f5a623' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 1v3M12 20v3M1 12h3M20 12h3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M19.8 4.2l-2.1 2.1M6.3 17.7l-2.1 2.1'/%3E%3C/g%3E%3C/svg%3E" class="mode" alt="浅色"></span>
+  <span class="dark"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z' fill='%236495ed'/%3E%3C/svg%3E" class="mode" alt="深色"></span>
+</button>
+
+<!-- 右上角：斜角飘带 -->
+<a id="ribbon" class="forkit" href="#"><span class="tag"></span></a>
+
+<!-- 站点头部 -->
+<header id="hero">
+  <h1 id="siteHeading"></h1>
+  <p id="siteSubtitle"></p>
+  <div id="top"></div>
+</header>
+
+<!-- 主目录：全部由 js/app.js 依据 js/data.js 递归生成 -->
+<main>
+  <ul id="mainmenu"></ul>
+</main>
+
+<footer id="footer"></footer>
+
+<!-- 底部搜索入口 -->
+<div id="bottomSearch"><button class="button" id="bottomSearchBtn">🔍 搜索本站（Ctrl + K）</button></div>
+
+<!-- 右侧快速目录 -->
+<aside id="sidebar" aria-label="快速目录">
+  <div class="sb-title">目录</div>
+  <div id="sidebarList"></div>
+  <div class="sb-actions">
+    <button id="expandAll">全部展开</button>
+    <button id="collapseAll">全部收起</button>
+  </div>
+</aside>
+
+<!-- 备注浮层（鼠标悬停 ⓘ 时显示） -->
+<div id="noteTip"></div>
+
+<!-- 站内搜索：命令面板 -->
+<div id="rsPanel" class="rs-panel" role="dialog" aria-modal="true" aria-label="站内搜索">
+  <div class="rs-box">
+    <input id="rsInput" class="rs-input" type="text" placeholder="搜索资源名称、备注或分类…" autocomplete="off" spellcheck="false">
+    <div id="rsList" class="rs-list"></div>
+    <div class="rs-footer">↑↓ 选择 · Enter 打开 · Esc 关闭 · 输入 / 或 Ctrl+K 唤起</div>
+  </div>
+</div>
+
+<!-- 点击 popup 条目时的说明弹窗 -->
+<div id="modalMask" class="modal-mask">
+  <div class="modal-box">
+    <button id="modalClose" class="modal-close" aria-label="关闭">×</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- 回到顶部 -->
+<button id="backTop" title="回到顶部" aria-label="回到顶部">↑</button>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

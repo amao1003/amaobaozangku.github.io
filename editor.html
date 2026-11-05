@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>内容编辑器 · 我的资源导航</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--line:#e3e6e8;--fg:#1f2328;--sub:#6b7280;--pri:#2563eb;--pri-soft:#e8f0fe;--danger:#dc2626;--ok:#059669}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.6 -apple-system,"Segoe UI","microsoft yahei",sans-serif;background:var(--bg);color:var(--fg)}
+button{font-family:inherit;cursor:pointer}
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+header h1{font-size:16px;margin:0 8px 0 0;white-space:nowrap}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:6px 11px;border-radius:6px;font-size:13px;white-space:nowrap}
+.btn:hover{border-color:var(--pri);color:var(--pri)}
+.btn.primary{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.primary:hover{background:#1d4ed8;color:#fff}
+.btn.danger{color:var(--danger)}
+.btn.danger:hover{border-color:var(--danger)}
+.spacer{flex:1}
+.hint{font-size:12px;color:var(--sub)}
+#draftBar{display:none;padding:8px 16px;background:#fff7e6;border-bottom:1px solid #f5d9a0;font-size:13px;gap:10px;align-items:center;flex-wrap:wrap}
+#draftBar.show{display:flex}
+#draftBar button{margin-left:6px}
+.wrap{display:flex;gap:14px;padding:14px;align-items:flex-start;min-height:calc(100vh - 60px)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+#left{width:330px;flex:none;position:sticky;top:70px;max-height:calc(100vh - 86px);display:flex;flex-direction:column;overflow:hidden}
+#left .ph{padding:11px 14px;border-bottom:1px solid var(--line);font-weight:600;display:flex;align-items:center;justify-content:space-between}
+#tree{overflow:auto;padding:8px 6px;flex:1}
+.trow{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow:hover{background:var(--pri-soft)}
+.trow.sel{background:var(--pri);color:#fff}
+.trow .tag{font-size:10px;padding:1px 5px;border:1px solid var(--line);border-radius:4px;color:var(--sub);flex:none}
+.trow.sel .tag{border-color:rgba(255,255,255,.5);color:#fff}
+.trow .tx{overflow:hidden;text-overflow:ellipsis}
+.tkids{margin-left:14px;border-left:1px dashed var(--line);padding-left:6px}
+.tkids.collapsed{display:none}
+.caret{width:12px;flex:none;color:var(--sub);font-size:10px;user-select:none}
+.trow.sel .caret{color:#fff}
+#right{flex:1;min-width:0;padding:18px 20px}
+#right h2{font-size:17px;margin:0 0 4px}
+#right .desc{color:var(--sub);font-size:12px;margin:0 0 16px}
+.field{margin-bottom:12px;max-width:720px}
+.field label{display:block;font-size:12px;color:var(--sub);margin-bottom:4px;font-weight:600}
+.field input[type=text],.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font:13px/1.5 inherit;background:#fff;color:var(--fg)}
+.field textarea{resize:vertical;min-height:70px;font-family:ui-monospace,Consolas,monospace}
+.field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 2px var(--pri-soft)}
+.field .tip{font-size:11px;color:var(--sub);margin-top:3px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.notice{background:#f0f7ff;border:1px solid #cfe0fb;border-radius:8px;padding:10px 12px;font-size:12px;color:#1e40af;margin-bottom:16px;line-height:1.8}
+.notice b{color:#1e3a8a}
+.empty{color:var(--sub);padding:40px 10px;text-align:center}
+#jsonArea{width:100%;min-height:52vh;font:12px/1.6 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:12px}
+.status{font-size:12px;color:var(--ok);margin-left:6px}
+@media(max-width:860px){.wrap{flex-direction:column}#left{position:static;width:100%;max-height:340px}#right{width:100%}.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✏️ 内容编辑器</h1>
+  <button class="btn" id="btnMeta">站点设置</button>
+  <button class="btn" id="btnAddCat">+ 一级分类</button>
+  <span class="spacer"></span>
+  <span class="hint" id="status"></span>
+  <button class="btn" id="btnJson">JSON 高级模式</button>
+  <button class="btn" id="btnImport">导入</button>
+  <button class="btn" id="btnExportJson">导出 JSON</button>
+  <button class="btn primary" id="btnExport">⬇ 导出 data.js</button>
+  <button class="btn" id="btnPreview">预览站点 ↗</button>
+</header>
+
+<div id="draftBar">
+  <span>检测到上次未导出的草稿。草稿保存在本机浏览器里，不影响线上站点。</span>
+  <button class="btn" id="btnLoadDraft">载入草稿</button>
+  <button class="btn" id="btnDropDraft">放弃草稿</button>
+</div>
+
+<div class="wrap">
+  <div id="left" class="panel">
+    <div class="ph"><span>目录结构</span><span class="hint" id="count"></span></div>
+    <div id="tree"></div>
+  </div>
+
+  <div id="right" class="panel">
+    <div class="notice">
+      <b>三步生效：</b>① 在左侧点选、右侧改内容 → ② 点右上「导出 data.js」→ ③ 把下载的文件覆盖项目里的 <code>js/data.js</code>，刷新 <code>index.html</code> 即可。<br>
+      所有改动先存在浏览器草稿里，<b>只有导出并覆盖文件才会真正改到站点</b>。
+    </div>
+    <div id="form"></div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".json,.js,.txt" style="display:none">
+
+<script src="js/data.js"></script>
+<script>
+(function(){
+'use strict';
+
+var DRAFT_KEY='nav-editor-draft', PREVIEW_KEY='nav-preview';
+var state=null, selected=null, jsonMode=false, draftChanged=false;
+
+/* ---------- 工具 ---------- */
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function getByPath(p){var c=state;for(var i=0;i<p.length;i++)c=c[p[i]];return c;}
+function locate(p){var idx=p[p.length-1];var arr=getByPath(p.slice(0,-1));return {arr:arr,idx:idx,obj:arr[idx]};}
+function isItem(p){return p[p.length-2]==='items';}
+function isRoot(p){return p===null;}
+function key(p){return p===null?'ROOT':JSON.stringify(p);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+function setStatus(t,ok){var n=document.getElementById('status');n.textContent=t;n.style.color=ok===false?'#dc2626':'#059669';if(t)setTimeout(function(){if(n.textContent===t)n.textContent='';},2600);}
+function saveDraft(){try{localStorage.setItem(DRAFT_KEY,JSON.stringify(state));draftChanged=true;}catch(e){}document.getElementById('count').textContent=countAll()+' 项';}
+function countAll(){var n=0;(function walk(list){(list||[]).forEach(function(c){n++;walk(c.children);n+=(c.items||[]).length;});})(state.categories);return n;}
+
+/* ---------- 载入数据 ---------- */
+function parseSite(text){
+  text=text.trim();
+  // 1) 标准 JSON（编辑器导出的 .json 备份，或直接粘贴的 JSON）
+  try{return JSON.parse(text);}catch(e){}
+  // 2) data.js 是 JS 文件，键可能不带引号（不是严格 JSON），整段求值后取 window.SITE
+  try{
+    var win={};
+    (new Function('window', text))(win);
+    if(win.SITE&&Array.isArray(win.SITE.categories))return win.SITE;
+  }catch(e){}
+  throw new Error('无法解析：请导入 JSON 文件或 data.js 文件');
+}
+function validate(o){
+  if(!o||typeof o!=='object'||!Array.isArray(o.categories))throw new Error('数据格式不对：必须包含 categories 数组');
+  if(!o.meta)o.meta={};
+  return o;
+}
+function loadFromFile(text){state=validate(parseSite(text));selected=null;saveDraft();renderAll();setStatus('导入成功');}
+
+/* ---------- 树 ---------- */
+function nodeLabel(obj,isItemNode){
+  if(isItemNode){
+    var t=obj.type||'link';
+    if(t==='split')return '———— 分隔线';
+    if(t==='note')return obj.text||'说明文字';
+    return obj.title||'(未命名条目)';
+  }
+  return obj.title||'(未命名分类)';
+}
+function renderTree(){
+  var host=document.getElementById('tree');host.innerHTML='';
+  var root=document.createElement('div');root.className='trow'+(selected===null?' sel':'');
+  root.innerHTML='<span class="tag">站点</span><span class="tx">⚙ 站点设置</span>';
+  root.onclick=function(){selected=null;jsonMode=false;renderAll();};
+  host.appendChild(root);
+
+  (state.categories||[]).forEach(function(cat,i){
+    host.appendChild(renderCatNode(['categories',i]));
+  });
+  document.getElementById('count').textContent=countAll()+' 项';
+}
+function renderCatNode(p){
+  var obj=getByPath(p);
+  var wrap=document.createElement('div');
+  var row=document.createElement('div');
+  row.className='trow'+(key(p)===key(selected)?' sel':'');
+  row.innerHTML='<span class="caret">▾</span><span class="tag">分类</span><span class="tx">'+esc(nodeLabel(obj,false))+'</span>';
+  row.onclick=function(e){e.stopPropagation();selected=p;jsonMode=false;renderAll();};
+  wrap.appendChild(row);
+
+  var kids=document.createElement('div');kids.className='tkids';
+  var hasKids=(obj.children||[]).length||(obj.items||[]).length;
+  if(!hasKids)kids.classList.add('collapsed');
+  row.querySelector('.caret').onclick=function(e){e.stopPropagation();kids.classList.toggle('collapsed');this.textContent=kids.classList.contains('collapsed')?'▸':'▾';};
+
+  (obj.children||[]).forEach(function(c,i){kids.appendChild(renderCatNode(p.concat(['children',i])));});
+  (obj.items||[]).forEach(function(it,i){
+    var ir=document.createElement('div');
+    var pk=p.concat(['items',i]);
+    ir.className='trow'+(key(pk)===key(selected)?' sel':'');
+    var tag=(it.type==='split')?'分隔':(it.type==='note'?'说明':(it.type==='popup'?'弹窗':'链接'));
+    ir.innerHTML='<span class="caret"></span><span class="tag">'+tag+'</span><span class="tx">'+esc(nodeLabel(it,true))+'</span>';
+    ir.onclick=function(e){e.stopPropagation();selected=pk;jsonMode=false;renderAll();};
+    kids.appendChild(ir);
+  });
+  wrap.appendChild(kids);
+  return wrap;
+}
+
+/* ---------- 表单 ---------- */
+var ICONS=['web','doc','link','folder','app','windows','apple','android','linux','youtube','gift','cart','weixin','tree','warning','ban','quote','star','code','cloud','search','image','music','book','ai'];
+var TYPES=[['link','普通链接'],['split','分隔线'],['note','说明文字'],['popup','点击弹窗']];
+var BADGES=[['','无'],['pay','付费标记'],['free','免费标记']];
+
+function field(label,key,value,type,extra){
+  extra=extra||{};
+  var f=document.createElement('div');f.className='field';
+  var lab=document.createElement('label');lab.textContent=label;f.appendChild(lab);
+  var input;
+  if(type==='textarea'){input=document.createElement('textarea');input.value=value||'';}
+  else if(type==='select'){
+    input=document.createElement('select');
+    (extra.options||[]).forEach(function(o){var op=document.createElement('option');op.value=o[0];op.textContent=o[1];input.appendChild(op);});
+    input.value=value||'';
+  }else{input=document.createElement('input');input.type='text';input.value=value==null?'':value;}
+  if(extra.placeholder)input.placeholder=extra.placeholder;
+  if(extra.tip){var t=document.createElement('div');t.className='tip';t.textContent=extra.tip;f.appendChild(t);}
+  if(!extra.skipBind){
+    input.addEventListener('input',function(){
+      var obj=(selected===null)?state.meta:getByPath(selected);
+      var v=input.value;
+      if(extra.jsonField){try{v=JSON.parse(v);}catch(e){setStatus('JSON 格式有误，请检查',false);return;}}
+      obj[key]=v;
+      saveDraft();
+      if(extra.treeLabel&&selected!==null){
+        var labelEl=document.querySelector('.trow.sel .tx');
+        if(labelEl)labelEl.textContent=nodeLabel(obj,isItem(selected));
+      }
+    });
+    input.addEventListener('change',function(){if(!extra.rebuild)renderTree();});
+  }
+  if(type==='select'&&extra.rebuild){input.addEventListener('change',function(){renderForm();renderTree();});}
+  f.insertBefore(input,lab.nextSibling);
+  return f;
+}
+
+function renderForm(){
+  var host=document.getElementById('form');host.innerHTML='';
+  if(jsonMode){renderJsonMode(host);return;}
+
+  if(selected===null){
+    host.innerHTML='<h2>⚙ 站点设置</h2><p class="desc">站点名称、标语、飘带、页脚等全局信息</p>';
+    var m=state.meta;
+    host.appendChild(field('浏览器标签标题','title',m.title,'text',{treeLabel:true}));
+    host.appendChild(field('页面大标题','heading',m.heading,'text',{treeLabel:true}));
+    host.appendChild(field('副标题 / 标语','subtitle',m.subtitle,'text'));
+    host.appendChild(field('SEO 描述','description',m.description,'text'));
+    host.appendChild(field('页脚文字','footer',m.footer,'textarea'));
+    var r=document.createElement('div');r.className='row2';
+    r.appendChild(field('飘带文字','',m.ribbon?m.ribbon.text:'','text',{skipBind:true,placeholder:'留空则不显示'}));
+    // 特殊处理 ribbon 子对象
+    r.lastChild.querySelector('input').addEventListener('input',function(){if(!state.meta.ribbon)state.meta.ribbon={};state.meta.ribbon.text=this.value;saveDraft();});
+    r.appendChild(field('飘带链接','',m.ribbon?m.ribbon.url:'','text',{skipBind:true,placeholder:'reply.html'}));
+    r.lastChild.querySelector('input').addEventListener('input',function(){if(!state.meta.ribbon)state.meta.ribbon={};state.meta.ribbon.url=this.value;saveDraft();});
+    host.appendChild(r);
+    var r2=document.createElement('div');r2.className='row2';
+    r2.appendChild(field('近 N 天标绿','recentDays',String(m.recentDays||10),'text',{skipBind:true,tip:'填数字，例如 10'}));
+    r2.lastChild.querySelector('input').addEventListener('input',function(){state.meta.recentDays=Number(this.value)||10;saveDraft();});
+    r2.appendChild(field('顶部按钮（JSON 数组）','topButtons',JSON.stringify(m.topButtons||[]),'textarea',{jsonField:true,tip:'格式：[{"text":"搜索本站","icon":"tree","action":"search"}]'}));
+    host.appendChild(r2);
+    var r3=document.createElement('div');r3.className='row2';
+    r3.appendChild(field('显示右侧目录','showSidebar',String(m.showSidebar!==false),'select',{skipBind:true,options:[['true','显示'],['false','隐藏']]}));
+    r3.lastChild.querySelector('select').addEventListener('change',function(){state.meta.showSidebar=this.value==='true';saveDraft();});
+    r3.appendChild(field('显示右上角飘带','showRibbon',String(m.showRibbon!==false),'select',{skipBind:true,options:[['true','显示'],['false','隐藏']]}));
+    r3.lastChild.querySelector('select').addEventListener('change',function(){state.meta.showRibbon=this.value==='true';saveDraft();});
+    host.appendChild(r3);
+    return;
+  }
+
+  var obj=getByPath(selected), loc=locate(selected);
+  var itemNode=isItem(selected);
+
+  if(!itemNode){
+    host.innerHTML='<h2>📁 编辑分类</h2><p class="desc">分类可以无限层级嵌套；直属条目显示在该分类子目录之后</p>';
+    host.appendChild(field('分类名称','title',obj.title,'text',{treeLabel:true,placeholder:'01.综合影视'}));
+    host.appendChild(field('分类备注（ⓘ 悬停显示）','note',obj.note,'textarea'));
+    var act=document.createElement('div');act.className='actions';
+    act.appendChild(mkBtn('+ 添加子分类',function(){if(!obj.children)obj.children=[];obj.children.push({title:'新分类',children:[],items:[]});saveDraft();renderAll();}));
+    act.appendChild(mkBtn('+ 添加条目',function(){if(!obj.items)obj.items=[];obj.items.push({title:'新条目',url:'https://',icon:'web'});saveDraft();renderAll();}));
+    act.appendChild(mkBtn('↑ 上移',function(){move(loc,-1);}));
+    act.appendChild(mkBtn('↓ 下移',function(){move(loc,1);}));
+    act.appendChild(mkBtn('⧉ 复制分类',function(){var c=clone(obj);loc.arr.splice(loc.idx+1,0,c);selected[selected.length-1]=loc.idx+1;saveDraft();renderAll();}));
+    act.appendChild(mkBtn('🗑 删除分类','danger',function(){if(!confirm('确定删除该分类及其下所有内容？'))return;loc.arr.splice(loc.idx,1);selected=null;saveDraft();renderAll();}));
+    host.appendChild(act);
+    return;
+  }
+
+  /* 条目表单 */
+  var t=obj.type||'link';
+  host.innerHTML='<h2>🔗 编辑条目</h2><p class="desc">所在分类：'+esc(pathText(selected))+'</p>';
+  host.appendChild(field('条目类型','type',t,'select',{options:TYPES,rebuild:true}));
+  if(t==='split'){
+    host.appendChild(field('（分隔线无其他字段，效果为 ————————）','', '','text',{skipBind:true,tip:'可在下方「上移 / 下移」调整位置'}));
+    host.lastChild.querySelector('input').disabled=true;
+  }else if(t==='note'){
+    host.appendChild(field('说明文字','text',obj.text,'textarea',{treeLabel:true}));
+  }else if(t==='popup'){
+    host.appendChild(field('显示标题','title',obj.title,'text',{treeLabel:true}));
+    host.appendChild(field('图标','icon',obj.icon||'doc','select',{options:ICONS.map(function(x){return [x,x];})}));
+    host.appendChild(field('弹窗内容（支持 HTML）','html',obj.html,'textarea',{tip:'例如 <p>使用说明</p><ul><li>第一步…</li></ul>'}));
+  }else{
+    var r1=document.createElement('div');r1.className='row2';
+    r1.appendChild(field('标题','title',obj.title,'text',{treeLabel:true,placeholder:'🥇站点名称'}));
+    r1.appendChild(field('网址 URL','url',obj.url,'text',{placeholder:'https://example.com'}));
+    host.appendChild(r1);
+    var r2=document.createElement('div');r2.className='row2';
+    r2.appendChild(field('图标','icon',obj.icon||'web','select',{options:ICONS.map(function(x){return [x,x];})}));
+    r2.appendChild(field('添加时间','date',obj.date,'text',{placeholder:'2026-11-03',tip:'近 N 天内的条目标题自动标绿；鼠标悬停显示'}));
+    host.appendChild(r2);
+    host.appendChild(field('备注（ⓘ 悬停显示）','note',obj.note,'textarea'));
+    var r3=document.createElement('div');r3.className='row2';
+    r3.appendChild(field('备用链接','backup',obj.backup,'text',{placeholder:'https://备用域名.com'}));
+    r3.appendChild(field('徽标','badge',obj.badge||'','select',{options:BADGES}));
+    host.appendChild(r3);
+    var r4=document.createElement('div');r4.className='row2';
+    r4.appendChild(field('支持平台','platform',obj.platform,'text',{placeholder:'Win,Mac,Android,iOS,Web',tip:'逗号分隔：Win / Mac / Linux / Android / iOS / Web / Extend'}));
+    r4.appendChild(field('点击前确认提示','confirm',obj.confirm,'text',{placeholder:'此站有广告，请留意'}));
+    host.appendChild(r4);
+  }
+  var act2=document.createElement('div');act2.className='actions';
+  act2.appendChild(mkBtn('+ 在其后插入条目',function(){loc.arr.splice(loc.idx+1,0,{title:'新条目',url:'https://',icon:'web'});selected[selected.length-1]=loc.idx+1;saveDraft();renderAll();}));
+  act2.appendChild(mkBtn('↑ 上移',function(){move(loc,-1);}));
+  act2.appendChild(mkBtn('↓ 下移',function(){move(loc,1);}));
+  act2.appendChild(mkBtn('⧉ 复制',function(){var c=clone(obj);loc.arr.splice(loc.idx+1,0,c);selected[selected.length-1]=loc.idx+1;saveDraft();renderAll();}));
+  act2.appendChild(mkBtn('🗑 删除条目','danger',function(){loc.arr.splice(loc.idx,1);selected=null;saveDraft();renderAll();}));
+  host.appendChild(act2);
+}
+
+function pathText(p){
+  var names=[],cur=state.categories;
+  for(var j=0;j<p.length-2;j++){
+    if(typeof p[j]==='number'&&cur&&cur[p[j]]){
+      names.push(cur[p[j]].title||'');
+      cur=cur[p[j]].children||[];
+    }
+  }
+  return names.join(' › ')||'顶级';
+}
+function mkBtn(text,cls,fn){
+  if(typeof cls==='function'){fn=cls;cls='';}
+  var b=document.createElement('button');b.className='btn'+(cls?' '+cls:'');b.textContent=text;
+  b.onclick=fn;return b;
+}
+function move(loc,delta){
+  var j=loc.idx+delta;
+  if(j<0||j>=loc.arr.length)return;
+  var tmp=loc.arr[loc.idx];loc.arr[loc.idx]=loc.arr[j];loc.arr[j]=tmp;
+  selected[selected.length-1]=j;saveDraft();renderAll();
+}
+
+/* ---------- JSON 高级模式 ---------- */
+function renderJsonMode(host){
+  host.innerHTML='<h2>🧩 JSON 高级模式</h2><p class="desc">直接编辑整份数据。改完点「应用」，然后记得导出 data.js。</p>';
+  var ta=document.createElement('textarea');ta.id='jsonArea';ta.value=JSON.stringify(state,null,2);host.appendChild(ta);
+  var act=document.createElement('div');act.className='actions';
+  act.appendChild(mkBtn('✅ 应用修改',function(){try{state=validate(JSON.parse(ta.value));selected=null;saveDraft();jsonMode=false;renderAll();setStatus('已应用');}catch(e){setStatus('JSON 有误：'+e.message,false);}}));
+  act.appendChild(mkBtn('返回可视化编辑',function(){jsonMode=false;renderAll();}));
+  host.appendChild(act);
+}
+
+function renderAll(){renderTree();renderForm();}
+
+/* ---------- 导入 / 导出 ---------- */
+function download(name,text){
+  var blob=new Blob([text],{type:'text/plain;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(url);a.remove();},500);
+}
+function exportDataJs(){
+  var header='/* ============================================================\n'+
+    ' * 由 editor.html 导出 · '+new Date().toLocaleString('zh-CN')+'\n'+
+    ' * 全站内容数据。字段说明见项目 README.md，或看原版 data.js 顶部注释。\n'+
+    ' * 覆盖本文件后刷新 index.html 即生效。\n'+
+    ' * ============================================================ */\n\n';
+  download('data.js',header+'window.SITE = '+JSON.stringify(state,null,2)+';\n');
+  setStatus('已导出 data.js，请覆盖 js/data.js');
+}
+
+/* ---------- 事件绑定 ---------- */
+document.getElementById('btnMeta').onclick=function(){selected=null;jsonMode=false;renderAll();};
+document.getElementById('btnAddCat').onclick=function(){state.categories.push({title:'新分类',children:[],items:[]});selected=['categories',state.categories.length-1];saveDraft();renderAll();};
+document.getElementById('btnJson').onclick=function(){jsonMode=!jsonMode;renderAll();};
+document.getElementById('btnExport').onclick=exportDataJs;
+document.getElementById('btnExportJson').onclick=function(){download('site-data.json',JSON.stringify(state,null,2));setStatus('已导出 JSON 备份');};
+document.getElementById('btnImport').onclick=function(){document.getElementById('fileInput').click();};
+document.getElementById('fileInput').onchange=function(e){
+  var f=e.target.files[0];if(!f)return;
+  var r=new FileReader();r.onload=function(){try{loadFromFile(r.result);}catch(err){setStatus(err.message,false);}};r.readAsText(f,'utf-8');e.target.value='';
+};
+document.getElementById('btnPreview').onclick=function(){
+  try{sessionStorage.setItem(PREVIEW_KEY,JSON.stringify(state));}catch(e){}
+  window.open('index.html#preview','_blank');
+  setStatus('已打开预览；若未生效请先导出 data.js');
+};
+document.getElementById('btnLoadDraft').onclick=function(){try{state=validate(JSON.parse(localStorage.getItem(DRAFT_KEY)));selected=null;renderAll();setStatus('已载入草稿');}catch(e){setStatus('草稿损坏',false);}document.getElementById('draftBar').classList.remove('show');};
+document.getElementById('btnDropDraft').onclick=function(){try{localStorage.removeItem(DRAFT_KEY);}catch(e){}document.getElementById('draftBar').classList.remove('show');setStatus('已放弃草稿');};
+
+/* ---------- 启动 ---------- */
+state=clone(window.SITE||{meta:{},categories:[]});
+try{
+  var d=localStorage.getItem(DRAFT_KEY);
+  if(d){var parsed=JSON.parse(d);if(parsed&&Array.isArray(parsed.categories))document.getElementById('draftBar').classList.add('show');}
+}catch(e){}
+renderAll();
+})();
+</script>
+</body>
+</html>
