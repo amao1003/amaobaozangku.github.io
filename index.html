@@ -14,9 +14,9 @@
 </head>
 <body>
 
-<!-- 特效层：背景动态线条（在内容下）+ 点击空白雪花（在内容上）
+<!-- 特效层：背景彩色空心星星（在内容下）+ 点击空白雪花（在内容上）
      两层都设置了 pointer-events:none，不会挡住任何链接或按钮 -->
-<canvas id="fxLines" class="fx-canvas" aria-hidden="true"></canvas>
+<canvas id="fxStars" class="fx-canvas" aria-hidden="true"></canvas>
 <canvas id="fxSnow" class="fx-canvas" aria-hidden="true"></canvas>
 
 <!-- 左上角：浅色 / 深色模式切换 -->
@@ -82,9 +82,9 @@
 <script src="js/app.js"></script>
 
 <!-- 特效开关：想关掉哪个就把 true 改成 false，保存后刷新页面即可。
-     lineCount 可填 2~6（线条数量），snowSize 可填 0.8 / 1.2（雪花大小）。 -->
+     starCount 可填 8~24（星星数量），starSize 可填 0.8 / 1.3（星星大小）。 -->
 <script>
-  window.AXU_FX = { lines: true, snow: true, lineCount: 4, snowSize: 1 };
+  window.AXU_FX = { stars: true, snow: true, starCount: 14, starSize: 1 };
 </script>
 <script src="js/effects.js"></script>
 </body>

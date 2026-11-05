@@ -1,59 +1,81 @@
 /* ==========================================================================
-   背景简约动态线条 + 点击空白「雪花绽放」
+   背景彩色空心星星（不规律跳动） + 点击空白「雪花绽放」
    --------------------------------------------------------------------------
    · 纯 Canvas 实现，不依赖任何库，不影响 js/app.js 的渲染与交互
-   · 两个特效层：背景线条（持续、极淡、缓慢）、雪花（只在点击空白时出现）
-   · 自动跟随浅色 / 深色模式；高分屏按 DPR 渲染，不会模糊
-   · 页面切到后台暂停绘制，尊重系统「减少动态效果」设置
+   · 背景层：十几个不同颜色的空心小星星，各自随机节奏轻轻跃动/闪一下，
+     互不同步、此起彼伏；低透明度、无填充，风格克制
+   · 交互层：只在点击页面空白处时出现六臂雪花
+   · 自动跟随浅色 / 深色模式；高分屏按 DPR 渲染；后台暂停绘制；
+     尊重系统「减少动态效果」设置
 
    ★ 开关：在 index.html 里改 window.AXU_FX 即可，不用动本文件。
-       window.AXU_FX = { lines: false }   // 关掉背景线条
+       window.AXU_FX = { stars: false }   // 关掉背景星星
        window.AXU_FX = { snow: false }    // 关掉点击雪花
-       window.AXU_FX = { lineCount: 2 }   // 线条少一点
+       window.AXU_FX = { starCount: 20 }  // 星星多一点
    ========================================================================== */
 (function () {
   'use strict';
 
   /* ---------------- 1. 配置 ---------------- */
   var DEFAULTS = {
-    lines: true,        // 背景动态线条
+    stars: true,        // 背景空心星星
     snow: true,         // 点击空白雪花绽放
-    lineCount: 4,       // 线条数量（建议 2~6）
-    lineAlpha: 1,       // 线条浓度倍率（0~1，0 等于关闭）
+    starCount: 14,      // 星星数量（建议 8~24）
+    starSize: 1,        // 星星大小倍率
+    starAlpha: 1,       // 星星浓度倍率（0~1，0 等于关闭）
     snowSize: 1,        // 雪花大小倍率
     maxBursts: 6        // 同屏最多几朵雪花，防止连点卡顿
   };
   var CFG = {};
   function merge(o) { if (o && typeof o === 'object') for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) CFG[k] = o[k]; }
   merge(DEFAULTS);
-  merge(window.AXU_FX);   // 用户在 index.html 里写的开关，优先级最高
+  var UX = window.AXU_FX || {};
+  merge(UX);   // 用户在 index.html 里写的开关，优先级最高
+  // 兼容上一版「线条」的旧键名（万一 index.html 没同步更新）
+  if (UX.stars === undefined && UX.lines !== undefined) CFG.stars = UX.lines;
+  if (UX.starCount === undefined && UX.lineCount !== undefined) CFG.starCount = Math.max(4, Math.round(Number(UX.lineCount) * 3.5) || 14);
+  if (UX.starAlpha === undefined && UX.lineAlpha !== undefined) CFG.starAlpha = UX.lineAlpha;
 
   var TAU = Math.PI * 2;
   var PI3 = Math.PI / 3;
   var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   var coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 
-  /* 两种主题下的配色，与原站 --link-hover 同一色系 */
+  /* 两套主题配色：星星是低饱和的多色，雪花沿用原站悬停蓝 */
   var LIGHT = {
-    line: [100, 149, 237], lineA: 0.16,
-    dot: [100, 149, 237], dotA: 0.5,
+    stars: [
+      [100, 149, 237],  // 蓝
+      [ 88, 176, 174],  // 青
+      [128, 178, 112],  // 绿
+      [166, 140, 208],  // 紫
+      [208, 168,  98],  // 金
+      [204, 136, 156]   // 粉
+    ],
+    starBase: 0.19,
     snow: [100, 149, 237], glow: [100, 149, 237]
   };
   var DARK = {
-    line: [127, 169, 245], lineA: 0.21,
-    dot: [168, 200, 255], dotA: 0.58,
+    stars: [
+      [127, 169, 245],
+      [110, 205, 200],
+      [150, 205, 130],
+      [190, 165, 235],
+      [232, 192, 120],
+      [228, 160, 180]
+    ],
+    starBase: 0.24,
     snow: [162, 199, 255], glow: [127, 169, 245]
   };
   function pal() { return document.documentElement.classList.contains('dark-mode') ? DARK : LIGHT; }
   function rgba(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + Math.max(0, Math.min(1, a)) + ')'; }
 
   /* ---------------- 2. 画布初始化 ---------------- */
-  var lineCv = document.getElementById('fxLines');
+  var starCv = document.getElementById('fxStars') || document.getElementById('fxLines'); // 后者兼容旧页面
   var snowCv = document.getElementById('fxSnow');
-  if (!lineCv || !snowCv) return;
-  var lctx = lineCv.getContext('2d');
+  if (!starCv || !snowCv) return;
+  var bctx = starCv.getContext('2d');
   var sctx = snowCv.getContext('2d');
-  if (!lctx || !sctx) return;
+  if (!bctx || !sctx) return;
 
   var W = 0, H = 0, DPR = 1;
 
@@ -67,79 +89,96 @@
     W = w; H = h;
   }
   function fitAll() {
-    fit(lineCv, lctx);
+    fit(starCv, bctx);
     fit(snowCv, sctx);
-    if (CFG.lines) drawLines(performance.now(), true);
+    if (CFG.stars) drawStars(performance.now());
   }
 
-  /* ---------------- 3. 背景线条 ---------------- */
+  /* ---------------- 3. 背景：不规律跳动的空心星星 ---------------- */
   var mouse = { nx: 0, ny: 0 };
-  var lines = [];
+  var stars = [];
 
-  function buildLines() {
-    var n = Math.max(1, Math.min(6, Number(CFG.lineCount) || 4));
-    if (coarse) n = Math.min(n, 2);
-    var ys = [0.17, 0.39, 0.63, 0.84, 0.28, 0.73];
-    lines = [];
+  function buildStars() {
+    var n = Math.max(1, Math.min(40, Number(CFG.starCount) || 14));
+    if (coarse) n = Math.max(1, Math.ceil(n / 2));
+    var size = Math.max(0.5, Math.min(2.5, Number(CFG.starSize) || 1));
+    var colors = LIGHT.stars.length;
+    stars = [];
     for (var i = 0; i < n; i++) {
-      lines.push({
-        y: ys[i % ys.length],
-        amp: 14 + i * 6,
-        speed: 0.10 + i * 0.028,
-        phase: i * 1.7,
-        alpha: (i === 1 || i === 3) ? 0.62 : 1,
-        dotSpeed: 0.018 + i * 0.009,
-        dotPhase: (i * 0.27) % 1
+      stars.push({
+        px: 0.04 + Math.random() * 0.92,      // 位置按视口比例存，resize 不会挤成一团
+        py: 0.05 + Math.random() * 0.90,
+        r: (4.4 + Math.random() * 5.0) * size,
+        colorIdx: i % colors,                 // 轮流取色，保证「不同色彩」且分布均匀
+        alpha: 0.72 + Math.random() * 0.5,
+        phase: Math.random() * TAU,
+        sp1: 0.22 + Math.random() * 0.5,      // 两个不同频率叠加 → 漂浮不规律
+        sp2: 0.12 + Math.random() * 0.34,
+        amp: 3 + Math.random() * 7,
+        rot: Math.random() * TAU,
+        rotSp: (Math.random() - 0.5) * 0.16,
+        points: Math.random() < 0.88 ? 5 : 4,  // 以空心五角星为主，少量四芒星
+        nextBeat: 0.3 + Math.random() * 3.6,   // 各自独立的下一次「跳动」时刻
+        beatAt: -100,
+        beatDur: 0.38 + Math.random() * 0.3
       });
     }
   }
 
-  function cubic(p0, p1, p2, p3, u) {
-    var v = 1 - u, a = v * v * v, b = 3 * v * v * u, c = 3 * v * u * u, d = u * u * u;
-    return {
-      x: a * p0.x + b * p1.x + c * p2.x + d * p3.x,
-      y: a * p0.y + b * p1.y + c * p2.y + d * p3.y
-    };
+  /* 只描边不填充 = 空心星星；5 角星 10 个顶点，4 芒星 8 个顶点 */
+  function starPath(ctx, x, y, r, points, rot) {
+    var n = points === 4 ? 8 : 10;
+    var inner = points === 4 ? 0.18 : 0.44;
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+      var rad = (i % 2 === 0) ? r : r * inner;
+      var a = rot - Math.PI / 2 + i * TAU / n;
+      var xx = x + Math.cos(a) * rad, yy = y + Math.sin(a) * rad;
+      if (i === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+    }
+    ctx.closePath();
+    ctx.stroke();
   }
 
-  function drawLines(now, force) {
+  function drawStars(now) {
     var p = pal();
-    var aScale = Math.max(0, Math.min(1, Number(CFG.lineAlpha))) || 0;
-    lctx.clearRect(0, 0, W, H);
+    var aScale = Number(CFG.starAlpha);
+    aScale = isNaN(aScale) ? 1 : Math.max(0, Math.min(1, aScale));
+    bctx.clearRect(0, 0, W, H);
     if (!aScale) return;
 
     var t = reduceMotion ? 0 : now / 1000;
-    var mx = reduceMotion ? 0 : mouse.nx * 14;
+    var mx = reduceMotion ? 0 : mouse.nx * 12;
     var my = reduceMotion ? 0 : mouse.ny * 9;
 
-    for (var i = 0; i < lines.length; i++) {
-      var L = lines[i];
-      var y0 = H * L.y + Math.sin(t * L.speed + L.phase) * L.amp + my;
-      var sway = Math.sin(t * L.speed * 0.74 + L.phase * 1.6) * L.amp * 1.8;
-      var p0 = { x: -70 + mx, y: y0 };
-      var p1 = { x: W * 0.28 + mx, y: y0 + sway };
-      var p2 = { x: W * 0.70 + mx, y: y0 - sway };
-      var p3 = { x: W + 70 + mx, y: y0 + sway * 0.32 };
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
 
-      var g = lctx.createLinearGradient(0, 0, W, 0);
-      g.addColorStop(0, rgba(p.line, 0));
-      g.addColorStop(0.20, rgba(p.line, p.lineA * L.alpha * aScale));
-      g.addColorStop(0.62, rgba(p.line, p.lineA * L.alpha * aScale * 0.78));
-      g.addColorStop(1, rgba(p.line, 0));
-      lctx.strokeStyle = g;
-      lctx.lineWidth = 1;
-      lctx.beginPath();
-      lctx.moveTo(p0.x, p0.y);
-      lctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
-      lctx.stroke();
+      // 到点就轻轻「跳」一下，然后随机安排下一次，所以彼此从不同步
+      var pulse = 0;
+      if (!reduceMotion) {
+        if (t >= s.nextBeat) {
+          s.beatAt = t;
+          s.nextBeat = t + 1.5 + Math.random() * 4.2;
+        }
+        var bp = (t - s.beatAt) / s.beatDur;
+        if (bp >= 0 && bp < 1) pulse = (1 - bp) * (bp < 0.16 ? bp / 0.16 : 1);
+      }
 
-      // 沿线缓慢滑行的一个小光点，让「动态」更克制
-      var u = reduceMotion ? (L.dotPhase + 0.25) % 1 : (t * L.dotSpeed + L.dotPhase) % 1;
-      var q = cubic(p0, p1, p2, p3, u);
-      lctx.fillStyle = rgba(p.dot, p.dotA * L.alpha * aScale);
-      lctx.beginPath();
-      lctx.arc(q.x, q.y, 1.7, 0, TAU);
-      lctx.fill();
+      var x = W * s.px
+            + Math.sin(t * s.sp1 + s.phase) * s.amp
+            + Math.cos(t * s.sp2 * 0.7 + s.phase * 1.3) * s.amp * 0.5
+            + mx;
+      var y = H * s.py
+            + Math.cos(t * s.sp2 + s.phase * 1.7) * s.amp * 0.8
+            + Math.sin(t * s.sp1 * 0.6 + s.phase) * s.amp * 0.4
+            + my - pulse * 5;
+      var r = s.r * (1 + pulse * 0.32);
+      var a = Math.min(0.42, p.starBase * s.alpha * (0.85 + pulse * 0.95) * aScale);
+
+      bctx.strokeStyle = rgba(p.stars[s.colorIdx % p.stars.length], a);
+      bctx.lineWidth = 1;
+      starPath(bctx, x, y, r, s.points, s.rot + (reduceMotion ? 0 : t * s.rotSp));
     }
   }
 
@@ -285,14 +324,14 @@
 
   /* ---------------- 5. 统一动画循环 ---------------- */
   var running = false;
-  var lastLine = 0;
+  var lastStar = 0;
   function ensureLoop() { if (!running) { running = true; requestAnimationFrame(frame); } }
 
   function frame(now) {
-    var needLines = !!CFG.lines && !reduceMotion;
-    if (!needLines && !bursts.length) { running = false; return; }
+    var needStars = !!CFG.stars && !reduceMotion;
+    if (!needStars && !bursts.length) { running = false; return; }
     if (!document.hidden) {
-      if (needLines && now - lastLine >= 32) { drawLines(now); lastLine = now; } // 线条 ~30fps 足够
+      if (needStars && now - lastStar >= 32) { drawStars(now); lastStar = now; } // 背景 ~30fps 足够
       if (bursts.length) drawSnow(now);
     } else if (bursts.length) {
       // 切到后台时不绘制，但把雪花时间轴推进，回来不会卡住一堆旧动画
@@ -321,12 +360,12 @@
   }, { passive: true });
 
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && CFG.lines) { lastLine = 0; ensureLoop(); }
+    if (!document.hidden && CFG.stars) { lastStar = 0; ensureLoop(); }
   });
 
   /* ---------------- 7. 启动 ---------------- */
-  buildLines();
+  buildStars();
   fitAll();
-  if (CFG.lines && !reduceMotion) ensureLoop();
-  // 减少动态效果时：只画一帧静态线条，雪花仍可点击但更短更温和
+  if (CFG.stars && !reduceMotion) ensureLoop();
+  // 减少动态效果时：星星只画一帧静态，雪花仍可点击但更短更温和
 })();
