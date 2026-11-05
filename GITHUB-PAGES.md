@@ -99,8 +99,11 @@
 - 自动定位本机便携版 Git 的绝对路径（系统 PATH 里没有 Git，脚本已写死实测路径）
 - 用 `用户名@users.noreply.github.com` 自动设置提交身份（GitHub 官方隐私邮箱，不用查注册邮箱）
 - 用 `reg query` 自动读取 Windows 系统代理端口（当前 7892；换软件或换端口会自动跟随），写入 `http.proxy` / `https.proxy`，并清空会干扰的沙箱代理变量
+- 第 1 步自动显示「上次用过的仓库地址」，**直接按回车即可沿用**，不必重新粘贴，避免手输错名字
+- 上传前用 `curl` 查 `https://api.github.com/repos/用户名/仓库名`，返回 200 才显示「[确认] GitHub 上找到了这个仓库」；返回 404 会醒目提醒名字可能不对（私有仓库可手动确认后继续）
+- 地址解析只截掉**末尾**的 `.git`，不再误伤 `.github.io` 这类仓库名
 - 自动 `remote add origin` → `git add -A` → `git commit` → `git push -u origin main`
-- push 失败时自动尝试 `git pull --allow-unrelated-histories --no-edit -X ours` 后重推（应对建仓库时勾了 README）
+- push 失败时自动尝试 `git pull --allow-unrelated-histories --no-rebase --no-edit -X ours` 后重推（应对建仓库时勾了 README；`--no-rebase` 是 Git 新版必需）
 - 成功后自动打开 Pages 设置页，并打印最终网址
 
 **过程中你只需要**：粘贴地址按回车 → 确认按回车 → 登录弹窗选 `Sign in with your browser` 并在网页点 `Authorize`。
@@ -233,6 +236,7 @@ git push
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
+| `remote: Repository not found` / `fatal: repository '...' not found` | 仓库名解析错了，或仓库未创建 / 私有 / 登录账号无权 | 核对浏览器地址栏里的 `用户名/仓库名`；`git remote set-url origin https://github.com/用户名/仓库名.git`；也可用 `curl https://api.github.com/users/用户名/repos` 列出公开仓库核对。**注意 `.github.io` 仓库名**：脚本早期用 `!VAR:.git=!` 全局去后缀，会把 `.github` 的前 4 个字符也删掉，变成 `hub.io`；已改为只截末尾 4 字符 |
 | `Failed to connect to github.com port 443: Timed out` | Git 没走代理，或代理软件没开 | 先双击 `检查网络.bat` 确认；执行 B2；WorkBuddy 终端还要先 `unset` 沙箱代理变量 |
 | `Authentication failed` / `Password authentication was removed` | 用了账号密码 | 用浏览器授权，或改用 PAT 当密码 |
 | `fatal: remote origin already exists` | 之前加过远程 | `git remote set-url origin https://github.com/用户名/仓库名.git` |
