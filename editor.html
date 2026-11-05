@@ -30,6 +30,12 @@ header h1{font-size:16px;margin:0 8px 0 0;white-space:nowrap}
 .trow{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .trow:hover{background:var(--pri-soft)}
 .trow.sel{background:var(--pri);color:#fff}
+.trow .chk{width:14px;height:14px;flex:none;margin:0 2px 0 0;cursor:pointer;accent-color:var(--pri)}
+.trow .chkspace{width:16px;flex:none}
+.trow.checked{background:#fff1f0}
+.trow.checked:hover{background:#ffe2df}
+.trow.sel.checked{background:var(--pri);color:#fff}
+.trow.sel .chk{accent-color:#fff}
 .trow .tag{font-size:10px;padding:1px 5px;border:1px solid var(--line);border-radius:4px;color:var(--sub);flex:none}
 .trow.sel .tag{border-color:rgba(255,255,255,.5);color:#fff}
 .trow .tx{overflow:hidden;text-overflow:ellipsis}
@@ -53,6 +59,16 @@ header h1{font-size:16px;margin:0 8px 0 0;white-space:nowrap}
 .empty{color:var(--sub);padding:40px 10px;text-align:center}
 #jsonArea{width:100%;min-height:52vh;font:12px/1.6 ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:8px;padding:12px}
 .status{font-size:12px;color:var(--ok);margin-left:6px}
+#multiBar{border-bottom:1px solid var(--line);background:#fafbfc;padding:8px 10px;flex:none}
+#multiBar .mb-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+#multiBar .mb-top label{display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+#multiBar input[type=checkbox]{width:14px;height:14px;margin:0;accent-color:var(--pri);cursor:pointer}
+#multiBar .mb-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+#multiBar .btn{padding:4px 9px;font-size:12px}
+#multiBar .btn.danger{color:var(--danger);border-color:#f3c6c6;background:#fff}
+#multiBar .btn.danger:hover:not(:disabled){background:var(--danger);color:#fff;border-color:var(--danger)}
+#multiBar .btn:disabled{opacity:.45;cursor:not-allowed}
+#multiBar .selinfo{color:var(--sub);margin-left:auto}
 @media(max-width:860px){.wrap{flex-direction:column}#left{position:static;width:100%;max-height:340px}#right{width:100%}.row2{grid-template-columns:1fr}}
 </style>
 </head>
@@ -80,13 +96,26 @@ header h1{font-size:16px;margin:0 8px 0 0;white-space:nowrap}
 <div class="wrap">
   <div id="left" class="panel">
     <div class="ph"><span>目录结构</span><span class="hint" id="count"></span></div>
+    <div id="multiBar">
+      <div class="mb-top">
+        <label><input type="checkbox" id="chkAll"> 全选</label>
+        <button class="btn" id="btnClearSel">清空选择</button>
+        <span class="selinfo" id="selInfo">未选择</span>
+      </div>
+      <div class="mb-actions">
+        <button class="btn danger" id="btnDeleteSel" disabled>🗑 删除选中</button>
+        <button class="btn" id="btnUndo" style="display:none">↩ 撤销删除</button>
+      </div>
+    </div>
     <div id="tree"></div>
   </div>
 
   <div id="right" class="panel">
     <div class="notice">
       <b>三步生效：</b>① 在左侧点选、右侧改内容 → ② 点右上「导出 data.js」→ ③ 把下载的文件覆盖项目里的 <code>js/data.js</code>，刷新 <code>index.html</code> 即可。<br>
-      所有改动先存在浏览器草稿里，<b>只有导出并覆盖文件才会真正改到站点</b>。
+      所有改动先存在浏览器草稿里，<b>只有导出并覆盖文件才会真正改到站点</b>。<br>
+      <b>批量删除：</b>勾选左侧目录 / 条目前的方框（按住 <b>Ctrl</b> 点行也能勾）→ 点「删除选中」；
+      勾选分类会连同它下面的内容一起删，删错了点「↩ 撤销删除」恢复。
     </div>
     <div id="form"></div>
   </div>
@@ -101,6 +130,7 @@ header h1{font-size:16px;margin:0 8px 0 0;white-space:nowrap}
 
 var DRAFT_KEY='nav-editor-draft', PREVIEW_KEY='nav-preview';
 var state=null, selected=null, jsonMode=false, draftChanged=false;
+var checked={}, undoState=null;
 
 /* ---------- 工具 ---------- */
 function clone(o){return JSON.parse(JSON.stringify(o));}
@@ -132,7 +162,152 @@ function validate(o){
   if(!o.meta)o.meta={};
   return o;
 }
-function loadFromFile(text){state=validate(parseSite(text));selected=null;saveDraft();renderAll();setStatus('导入成功');}
+function loadFromFile(text){structureChanged();state=validate(parseSite(text));selected=null;saveDraft();renderAll();setStatus('导入成功');}
+
+/* ---------- 多选与批量删除 ---------- */
+/* 勾选以「路径 JSON」为键。删除时先换成对象引用再递归过滤，
+   避免按索引删除造成的路径错位；勾选父会自动带上后代，
+   取消子会自动取消祖先，保证「没勾的一定留、勾了的一定删」。 */
+function allNodePaths(){
+  var out=[];
+  (function walkCats(list,prefix){
+    (list||[]).forEach(function(c,i){
+      var p=prefix.concat([i]);
+      out.push(p);
+      (c.items||[]).forEach(function(it,j){out.push(p.concat(['items',j]));});
+      walkCats(c.children,p.concat(['children']));
+    });
+  })(state.categories,['categories']);
+  return out;
+}
+function descendantPaths(p){
+  var out=[],obj;
+  try{obj=getByPath(p);}catch(e){return out;}
+  if(!obj||typeof obj!=='object')return out;
+  (obj.children||[]).forEach(function(c,i){
+    var cp=p.concat(['children',i]);out.push(cp);out=out.concat(descendantPaths(cp));
+  });
+  (obj.items||[]).forEach(function(it,i){out.push(p.concat(['items',i]));});
+  return out;
+}
+function ancestorPaths(p){
+  var out=[];
+  for(var n=2;n<p.length;n+=2)out.push(p.slice(0,n));
+  return out;
+}
+function checkedPaths(){
+  var out=[];
+  for(var k in checked){
+    if(Object.prototype.hasOwnProperty.call(checked,k)&&checked[k]){
+      try{
+        var p=JSON.parse(k),o=getByPath(p);
+        if(o&&typeof o==='object')out.push(p);
+      }catch(e){}
+    }
+  }
+  return out;
+}
+function setChecked(p,on){
+  var target;
+  try{target=getByPath(p);}catch(e){return;}
+  if(!target||typeof target!=='object')return;
+  if(on){
+    checked[key(p)]=true;
+    descendantPaths(p).forEach(function(dp){checked[key(dp)]=true;});
+  }else{
+    delete checked[key(p)];
+    descendantPaths(p).forEach(function(dp){delete checked[key(dp)];});
+    ancestorPaths(p).forEach(function(ap){delete checked[key(ap)];});
+  }
+}
+function toggleChecked(p,on){setChecked(p,on);syncCheckboxes();}
+function structureChanged(){checked={};undoState=null;}
+function clearChecked(){checked={};updateMultiBar();}
+function hasCheckedAncestor(p){
+  var as=ancestorPaths(p);
+  for(var i=0;i<as.length;i++)if(checked[key(as[i])])return true;
+  return false;
+}
+function sizeOf(obj){
+  var n=0;
+  (obj.children||[]).forEach(function(c){n+=1+sizeOf(c);});
+  n+=(obj.items||[]).length;
+  return n;
+}
+function selectionSummary(){
+  var units=checkedPaths().filter(function(p){return !hasCheckedAncestor(p);});
+  var cats=0,items=0,total=0,names=[];
+  units.forEach(function(p){
+    var obj;try{obj=getByPath(p);}catch(e){return;}
+    if(!obj)return;
+    var sub=sizeOf(obj);
+    total+=1+sub;
+    if(isItem(p)){items++;names.push('条目「'+nodeLabel(obj,true)+'」');}
+    else{cats++;names.push('分类「'+nodeLabel(obj,false)+'」'+(sub?'（含 '+sub+' 个子项）':''));}
+  });
+  return {units:units,cats:cats,items:items,total:total,names:names};
+}
+function syncCheckboxes(){
+  var rows=document.querySelectorAll('.trow[data-k]');
+  for(var i=0;i<rows.length;i++){
+    var k=rows[i].getAttribute('data-k'),on=!!checked[k];
+    var cb=rows[i].querySelector('.chk');
+    if(cb)cb.checked=on;
+    if(on)rows[i].classList.add('checked');else rows[i].classList.remove('checked');
+  }
+  updateMultiBar();
+}
+function updateMultiBar(){
+  if(!state)return;
+  var n=checkedPaths().length;
+  var info=document.getElementById('selInfo');
+  if(info){
+    if(n){var sm=selectionSummary();info.textContent='已选 '+n+' 项 · 将删 '+sm.total+' 项';}
+    else info.textContent='未选择';
+  }
+  var del=document.getElementById('btnDeleteSel');if(del)del.disabled=(n===0);
+  var all=allNodePaths(),ca=document.getElementById('chkAll');
+  if(ca){ca.checked=(n>0&&n===all.length);ca.indeterminate=(n>0&&n<all.length);}
+  var ub=document.getElementById('btnUndo');if(ub)ub.style.display=undoState?'':'none';
+}
+function checkAll(on){
+  checked={};
+  if(on)allNodePaths().forEach(function(p){checked[key(p)]=true;});
+  syncCheckboxes();
+}
+function deleteChecked(){
+  var sm=selectionSummary();
+  if(!sm.units.length)return;
+  var lines=sm.names.slice(0,8).map(function(x){return '· '+x;});
+  if(sm.names.length>8)lines.push('· …… 另有 '+(sm.names.length-8)+' 项');
+  var msg='确定删除选中的 '+sm.units.length+' 个节点吗？\n\n'+lines.join('\n')+
+    '\n\n连同分类下的子内容，共 '+sm.total+' 项会被删除。'+
+    '\n删错了可以点「↩ 撤销删除」恢复；确认无误后记得导出 data.js。';
+  if(!confirm(msg))return;
+  undoState=clone(state);
+  var doomed=[];
+  checkedPaths().forEach(function(p){
+    try{var o=getByPath(p);if(o&&typeof o==='object')doomed.push(o);}catch(e){}
+  });
+  function filterCats(list){
+    return (list||[]).filter(function(c){
+      if(doomed.indexOf(c)!==-1)return false;
+      if(Array.isArray(c.children))c.children=filterCats(c.children);
+      if(Array.isArray(c.items))c.items=c.items.filter(function(it){return doomed.indexOf(it)===-1;});
+      return true;
+    });
+  }
+  state.categories=filterCats(state.categories);
+  selected=null;jsonMode=false;
+  clearChecked();saveDraft();renderAll();
+  setStatus('已删除 '+sm.total+' 项，可点「撤销删除」恢复');
+}
+function undoDelete(){
+  if(!undoState)return;
+  state=undoState;undoState=null;selected=null;jsonMode=false;
+  clearChecked();saveDraft();renderAll();
+  setStatus('已撤销删除，内容已恢复');
+}
 
 /* ---------- 树 ---------- */
 function nodeLabel(obj,isItemNode){
@@ -147,7 +322,7 @@ function nodeLabel(obj,isItemNode){
 function renderTree(){
   var host=document.getElementById('tree');host.innerHTML='';
   var root=document.createElement('div');root.className='trow'+(selected===null?' sel':'');
-  root.innerHTML='<span class="tag">站点</span><span class="tx">⚙ 站点设置</span>';
+  root.innerHTML='<span class="chkspace"></span><span class="tag">站点</span><span class="tx">⚙ 站点设置</span>';
   root.onclick=function(){selected=null;jsonMode=false;renderAll();};
   host.appendChild(root);
 
@@ -155,14 +330,24 @@ function renderTree(){
     host.appendChild(renderCatNode(['categories',i]));
   });
   document.getElementById('count').textContent=countAll()+' 项';
+  syncCheckboxes();
 }
 function renderCatNode(p){
   var obj=getByPath(p);
   var wrap=document.createElement('div');
   var row=document.createElement('div');
   row.className='trow'+(key(p)===key(selected)?' sel':'');
-  row.innerHTML='<span class="caret">▾</span><span class="tag">分类</span><span class="tx">'+esc(nodeLabel(obj,false))+'</span>';
-  row.onclick=function(e){e.stopPropagation();selected=p;jsonMode=false;renderAll();};
+  row.setAttribute('data-k',key(p));
+  row.innerHTML='<input type="checkbox" class="chk"><span class="caret">▾</span><span class="tag">分类</span><span class="tx">'+esc(nodeLabel(obj,false))+'</span>';
+  var cb=row.querySelector('.chk');
+  cb.checked=!!checked[key(p)];
+  cb.onclick=function(e){e.stopPropagation();};
+  cb.onchange=function(e){e.stopPropagation();toggleChecked(p,this.checked);};
+  row.onclick=function(e){
+    e.stopPropagation();
+    if(e.ctrlKey||e.metaKey){toggleChecked(p,!checked[key(p)]);return;}
+    selected=p;jsonMode=false;renderAll();
+  };
   wrap.appendChild(row);
 
   var kids=document.createElement('div');kids.className='tkids';
@@ -175,9 +360,18 @@ function renderCatNode(p){
     var ir=document.createElement('div');
     var pk=p.concat(['items',i]);
     ir.className='trow'+(key(pk)===key(selected)?' sel':'');
+    ir.setAttribute('data-k',key(pk));
     var tag=(it.type==='split')?'分隔':(it.type==='note'?'说明':(it.type==='popup'?'弹窗':'链接'));
-    ir.innerHTML='<span class="caret"></span><span class="tag">'+tag+'</span><span class="tx">'+esc(nodeLabel(it,true))+'</span>';
-    ir.onclick=function(e){e.stopPropagation();selected=pk;jsonMode=false;renderAll();};
+    ir.innerHTML='<input type="checkbox" class="chk"><span class="caret"></span><span class="tag">'+tag+'</span><span class="tx">'+esc(nodeLabel(it,true))+'</span>';
+    var icb=ir.querySelector('.chk');
+    icb.checked=!!checked[key(pk)];
+    icb.onclick=function(e){e.stopPropagation();};
+    icb.onchange=function(e){e.stopPropagation();toggleChecked(pk,this.checked);};
+    ir.onclick=function(e){
+      e.stopPropagation();
+      if(e.ctrlKey||e.metaKey){toggleChecked(pk,!checked[key(pk)]);return;}
+      selected=pk;jsonMode=false;renderAll();
+    };
     kids.appendChild(ir);
   });
   wrap.appendChild(kids);
@@ -262,12 +456,12 @@ function renderForm(){
     host.appendChild(field('分类名称','title',obj.title,'text',{treeLabel:true,placeholder:'01.综合影视'}));
     host.appendChild(field('分类备注（ⓘ 悬停显示）','note',obj.note,'textarea'));
     var act=document.createElement('div');act.className='actions';
-    act.appendChild(mkBtn('+ 添加子分类',function(){if(!obj.children)obj.children=[];obj.children.push({title:'新分类',children:[],items:[]});saveDraft();renderAll();}));
-    act.appendChild(mkBtn('+ 添加条目',function(){if(!obj.items)obj.items=[];obj.items.push({title:'新条目',url:'https://',icon:'web'});saveDraft();renderAll();}));
+    act.appendChild(mkBtn('+ 添加子分类',function(){structureChanged();if(!obj.children)obj.children=[];obj.children.push({title:'新分类',children:[],items:[]});saveDraft();renderAll();}));
+    act.appendChild(mkBtn('+ 添加条目',function(){structureChanged();if(!obj.items)obj.items=[];obj.items.push({title:'新条目',url:'https://',icon:'web'});saveDraft();renderAll();}));
     act.appendChild(mkBtn('↑ 上移',function(){move(loc,-1);}));
     act.appendChild(mkBtn('↓ 下移',function(){move(loc,1);}));
-    act.appendChild(mkBtn('⧉ 复制分类',function(){var c=clone(obj);loc.arr.splice(loc.idx+1,0,c);selected[selected.length-1]=loc.idx+1;saveDraft();renderAll();}));
-    act.appendChild(mkBtn('🗑 删除分类','danger',function(){if(!confirm('确定删除该分类及其下所有内容？'))return;loc.arr.splice(loc.idx,1);selected=null;saveDraft();renderAll();}));
+    act.appendChild(mkBtn('⧉ 复制分类',function(){structureChanged();var c=clone(obj);loc.arr.splice(loc.idx+1,0,c);selected[selected.length-1]=loc.idx+1;saveDraft();renderAll();}));
+    act.appendChild(mkBtn('🗑 删除分类','danger',function(){if(!confirm('确定删除该分类及其下所有内容？'))return;structureChanged();loc.arr.splice(loc.idx,1);selected=null;saveDraft();renderAll();}));
     host.appendChild(act);
     return;
   }
@@ -305,11 +499,11 @@ function renderForm(){
     host.appendChild(r4);
   }
   var act2=document.createElement('div');act2.className='actions';
-  act2.appendChild(mkBtn('+ 在其后插入条目',function(){loc.arr.splice(loc.idx+1,0,{title:'新条目',url:'https://',icon:'web'});selected[selected.length-1]=loc.idx+1;saveDraft();renderAll();}));
+  act2.appendChild(mkBtn('+ 在其后插入条目',function(){structureChanged();loc.arr.splice(loc.idx+1,0,{title:'新条目',url:'https://',icon:'web'});selected[selected.length-1]=loc.idx+1;saveDraft();renderAll();}));
   act2.appendChild(mkBtn('↑ 上移',function(){move(loc,-1);}));
   act2.appendChild(mkBtn('↓ 下移',function(){move(loc,1);}));
-  act2.appendChild(mkBtn('⧉ 复制',function(){var c=clone(obj);loc.arr.splice(loc.idx+1,0,c);selected[selected.length-1]=loc.idx+1;saveDraft();renderAll();}));
-  act2.appendChild(mkBtn('🗑 删除条目','danger',function(){loc.arr.splice(loc.idx,1);selected=null;saveDraft();renderAll();}));
+  act2.appendChild(mkBtn('⧉ 复制',function(){structureChanged();var c=clone(obj);loc.arr.splice(loc.idx+1,0,c);selected[selected.length-1]=loc.idx+1;saveDraft();renderAll();}));
+  act2.appendChild(mkBtn('🗑 删除条目','danger',function(){structureChanged();loc.arr.splice(loc.idx,1);selected=null;saveDraft();renderAll();}));
   host.appendChild(act2);
 }
 
@@ -331,6 +525,7 @@ function mkBtn(text,cls,fn){
 function move(loc,delta){
   var j=loc.idx+delta;
   if(j<0||j>=loc.arr.length)return;
+  structureChanged();
   var tmp=loc.arr[loc.idx];loc.arr[loc.idx]=loc.arr[j];loc.arr[j]=tmp;
   selected[selected.length-1]=j;saveDraft();renderAll();
 }
@@ -340,7 +535,7 @@ function renderJsonMode(host){
   host.innerHTML='<h2>🧩 JSON 高级模式</h2><p class="desc">直接编辑整份数据。改完点「应用」，然后记得导出 data.js。</p>';
   var ta=document.createElement('textarea');ta.id='jsonArea';ta.value=JSON.stringify(state,null,2);host.appendChild(ta);
   var act=document.createElement('div');act.className='actions';
-  act.appendChild(mkBtn('✅ 应用修改',function(){try{state=validate(JSON.parse(ta.value));selected=null;saveDraft();jsonMode=false;renderAll();setStatus('已应用');}catch(e){setStatus('JSON 有误：'+e.message,false);}}));
+  act.appendChild(mkBtn('✅ 应用修改',function(){try{structureChanged();state=validate(JSON.parse(ta.value));selected=null;saveDraft();jsonMode=false;renderAll();setStatus('已应用');}catch(e){setStatus('JSON 有误：'+e.message,false);}}));
   act.appendChild(mkBtn('返回可视化编辑',function(){jsonMode=false;renderAll();}));
   host.appendChild(act);
 }
@@ -365,8 +560,12 @@ function exportDataJs(){
 }
 
 /* ---------- 事件绑定 ---------- */
+document.getElementById('chkAll').onchange=function(){checkAll(this.checked);};
+document.getElementById('btnClearSel').onclick=function(){checked={};syncCheckboxes();};
+document.getElementById('btnDeleteSel').onclick=deleteChecked;
+document.getElementById('btnUndo').onclick=undoDelete;
 document.getElementById('btnMeta').onclick=function(){selected=null;jsonMode=false;renderAll();};
-document.getElementById('btnAddCat').onclick=function(){state.categories.push({title:'新分类',children:[],items:[]});selected=['categories',state.categories.length-1];saveDraft();renderAll();};
+document.getElementById('btnAddCat').onclick=function(){structureChanged();state.categories.push({title:'新分类',children:[],items:[]});selected=['categories',state.categories.length-1];saveDraft();renderAll();};
 document.getElementById('btnJson').onclick=function(){jsonMode=!jsonMode;renderAll();};
 document.getElementById('btnExport').onclick=exportDataJs;
 document.getElementById('btnExportJson').onclick=function(){download('site-data.json',JSON.stringify(state,null,2));setStatus('已导出 JSON 备份');};
@@ -380,7 +579,7 @@ document.getElementById('btnPreview').onclick=function(){
   window.open('index.html#preview','_blank');
   setStatus('已打开预览；若未生效请先导出 data.js');
 };
-document.getElementById('btnLoadDraft').onclick=function(){try{state=validate(JSON.parse(localStorage.getItem(DRAFT_KEY)));selected=null;renderAll();setStatus('已载入草稿');}catch(e){setStatus('草稿损坏',false);}document.getElementById('draftBar').classList.remove('show');};
+document.getElementById('btnLoadDraft').onclick=function(){try{structureChanged();state=validate(JSON.parse(localStorage.getItem(DRAFT_KEY)));selected=null;renderAll();setStatus('已载入草稿');}catch(e){setStatus('草稿损坏',false);}document.getElementById('draftBar').classList.remove('show');};
 document.getElementById('btnDropDraft').onclick=function(){try{localStorage.removeItem(DRAFT_KEY);}catch(e){}document.getElementById('draftBar').classList.remove('show');setStatus('已放弃草稿');};
 
 /* ---------- 启动 ---------- */
