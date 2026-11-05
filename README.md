@@ -39,10 +39,12 @@ axutongxue-clone/
 ├── editor.html      ★ 可视化内容编辑器（改内容不用碰代码）
 ├── reply.html       右上角飘带的落地页（占位，可随意替换）
 ├── css/
-│   └── style.css    全部样式：缩进树、图标、深浅色、搜索面板、响应式
+│   ├── style.css    全部样式：缩进树、图标、深浅色、搜索面板、响应式
+│   └── effects.css  特效层定位与层级（背景线条 / 雪花）
 ├── js/
 │   ├── data.js      ★★ 全站内容数据 —— 唯一必须编辑的文件
-│   └── app.js       渲染引擎 + 全部交互（一般不用改）
+│   ├── app.js       渲染引擎 + 全部交互（一般不用改）
+│   └── effects.js   背景动态线条 + 点击空白雪花绽放
 └── README.md        本文件
 ```
 
@@ -204,6 +206,31 @@ window.SITE = {
 
 > 图标字体用的是 Font Awesome 4.7。若你的网络访问不了 `code.bdstatic.com`，
 > 把 `index.html` 里的 `<link>` 换成任意 CDN（如 cdnjs）即可；完全离线时会自动降级成圆点。
+
+### 背景动态线条 与 点击雪花（可一键开关）
+
+首页背景有 4 条极淡的蓝色曲线缓慢流动，鼠标移动时有轻微视差；**在页面空白处单击**，会出现一朵六臂雪花绽放并散出小冰晶（约 1 秒后淡出）。点链接、按钮、标题文字、搜索面板里都不会触发，也不会挡住任何原有交互。
+
+开关和调参都在 `index.html` 最底部，改完保存刷新即可，不用碰 JS：
+
+```html
+<script>
+  window.AXU_FX = { lines: true, snow: true, lineCount: 4, snowSize: 1 };
+</script>
+```
+
+| 参数 | 说明 |
+|---|---|
+| `lines` | `false` 关掉背景线条 |
+| `snow` | `false` 关掉点击雪花 |
+| `lineCount` | 线条数量，2~6；触屏设备自动降到 2 |
+| `snowSize` | 雪花大小倍率，如 `0.8` / `1.2` |
+| `lineAlpha` | 线条浓度 0~1（可选，写在上面对象里） |
+
+- 颜色自动跟随浅色 / 深色模式，用的是 `--link-hover` 同色系；想换色改 `js/effects.js` 顶部的 `LIGHT` / `DARK`。
+- 线条约 30fps、雪花按点击触发；切到后台暂停绘制，同屏雪花最多 6 朵，不会拖慢页面。
+- 系统开启「减少动态效果」时，线条只画一帧静态、雪花缩短为温和淡出。
+- 两个 canvas 都是 `pointer-events:none`，`editor.html` 与 `reply.html` 未加载特效（保持工具页干净）。
 
 ---
 

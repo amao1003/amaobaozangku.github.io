@@ -1,0 +1,43 @@
+/* ==========================================================================
+   背景动态线条 + 点击雪花（独立特效层）
+   —— 只负责定位与层级，不改动 css/style.css 里的任何原有规则。
+
+   层级说明：
+     #fxLines   z-index 0   在内容「下面」，永不拦截鼠标
+     #fxSnow    z-index 9000 在内容「上面」，但低于备注浮层(9990)、
+                             说明弹窗(9995)、搜索面板(2147483000)
+   两个 canvas 都设了 pointer-events:none，所以链接、按钮、搜索、
+   折叠、备注等原有交互完全不受影响。
+   ========================================================================== */
+
+.fx-canvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  pointer-events: none !important;  /* 关键：点击会穿透到下面的真实页面 */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#fxLines { z-index: 0; }
+#fxSnow  { z-index: 9000; }
+
+/* 让主要文字内容明确位于背景线条之上。
+   （position:fixed 的 canvas 默认会盖在非定位内容上，这一段把它压回背景） */
+#hero,
+#mainmenu,
+#footer,
+#bottomSearch {
+  position: relative;
+  z-index: 1;
+}
+
+/* 尊重系统「减少动态效果」偏好：静态线条不闪烁 */
+@media (prefers-reduced-motion: reduce) {
+  .fx-canvas { opacity: .75; }
+}

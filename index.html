@@ -7,11 +7,17 @@
 <meta name="description" content="个人互联网资源导航">
 <link rel="canonical" href="./">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/effects.css">
 <!-- 图标字体：联网时与原站一致；离线时 app.js 会自动启用字符兜底，不影响使用 -->
 <link rel="stylesheet" href="https://code.bdstatic.com/npm/font-awesome@4.7.0/css/font-awesome.min.css">
 <title>我的资源导航</title>
 </head>
 <body>
+
+<!-- 特效层：背景动态线条（在内容下）+ 点击空白雪花（在内容上）
+     两层都设置了 pointer-events:none，不会挡住任何链接或按钮 -->
+<canvas id="fxLines" class="fx-canvas" aria-hidden="true"></canvas>
+<canvas id="fxSnow" class="fx-canvas" aria-hidden="true"></canvas>
 
 <!-- 左上角：浅色 / 深色模式切换 -->
 <button id="themeToggle" class="darkmode-toggle" title="切换深浅色（也可按 D 键）" aria-label="切换深浅色">
@@ -74,5 +80,12 @@
 
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
+
+<!-- 特效开关：想关掉哪个就把 true 改成 false，保存后刷新页面即可。
+     lineCount 可填 2~6（线条数量），snowSize 可填 0.8 / 1.2（雪花大小）。 -->
+<script>
+  window.AXU_FX = { lines: true, snow: true, lineCount: 4, snowSize: 1 };
+</script>
+<script src="js/effects.js"></script>
 </body>
 </html>
